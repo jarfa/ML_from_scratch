@@ -1,14 +1,6 @@
 import warnings
-from copy import deepcopy
 from operator import add
 import numpy as np
-
-def combine_dicts(A, B, fn=add):
-    # http://stackoverflow.com/a/11011911/3011972
-    return {x: fn(A.get(x, 0), B.get(x, 0)) for x in set(A).union(B)}
-
-def logloss_gradient(target, prediction):
-    return np.mean(prediction - target)
 
 def logloss(observed, predicted):
     # keep loss from being infinite
@@ -27,6 +19,12 @@ def ilogit(log_odds):
         warnings.simplefilter("ignore")
         return 1. / (1. + np.exp(-log_odds))
 
+def shuffle_rows(data, targets):
+    if not data.shape[0] == len(targets):
+        raise Exception("Data and targets do not have the same number of rows.")
+    shuffle_ix = np.random.permutation(len(targets))
+    return data[shuffle_ix,:], targets[shuffle_ix]
+
 class LogisticSGD():
     def __init__(self, alpha, minibatch=1, weight_init="zero", l1=0, l2=0):
         if l1 != 0 or l2 != 0:
@@ -39,61 +37,57 @@ class LogisticSGD():
         self.l1 = l1
         self.l2 = l2
 
-        self.weights = {"bias": 0.0}
+    def predict(self, events):
+        return events.dot(self.weights)
 
-    def predict(self, event):
-        return sum(self.weights.get(k, 0.0) * v for k,v in event.iteritems())
+    def predict_prob(self, events):
+        return ilogit(self.predict(events))
 
-    def predict_prob(self, event):
-        return ilogit(self.predict(event))
+    def logloss_gradient(self, data, targets):
+        predictions = self.predict_prob(data)
+        return (predictions - targets).dot(data) / self.minibatch
 
-    def get_minibatches(self, data):
-        for start in range(0, len(data), self.minibatch):
-            # copy to avoid messing up future epochs
-            yield deepcopy(data[start:(start + self.minibatch)])
+    def get_minibatches(self, data, targets):
+        N = len(targets)
+        for start in range(0, N, self.minibatch):
+            yield (data[start:(start + self.minibatch),], 
+                targets[start:(start + self.minibatch)])
         
-    def train(self, data, n_epochs=1, holdout_every=10):
-        # add bias 'feature'
-        for event in data:
-            event["bias"] = 1.0
-
+    def train(self, targets, data, n_epochs=1, holdout_proportion=0.2):
+        Ntotal, Nfeat = data.shape
+        self.weights = np.zeros(Nfeat + 1)
+        # add bias column
+        data = np.hstack((np.ones((Ntotal,1)), data))
+        
         # generate holdout set
-        np.random.shuffle(data) #make sure there's no regular pattern in the data
-        holdout_set = [event for i,event in enumerate(data) if i % holdout_every == 0]
-        data = [event for i,event in enumerate(data) if i % holdout_every != 0]
+        Nholdout = round(holdout_proportion * Ntotal)
+        data, targets = shuffle_rows(data, targets)
+        
+        holdout_data = data[:Nholdout,:]
+        holdout_targets = targets[:Nholdout]
+        train_data = data[Nholdout:,:]
+        train_targets = targets[Nholdout:]
 
         for epoch in range(n_epochs):
             if epoch > 0:
-                np.random.shuffle(data)
-            for batch in self.get_minibatches(data):
-                n_batch = len(batch) # note: n_batch != self.minibatch on the last iteration
+                train_data, train_targets = shuffle_rows(train_data, train_targets)
+            for batch_data, batch_targets in self.get_minibatches(train_data, train_targets):
                 # evalute this minibatch with the current weights
-                targets = np.array([event.pop("target") for event in batch])
-                predictions = np.array([self.predict_prob(event) for event in batch])
-                gradient = logloss_gradient(targets, predictions) #am I taking the sum of gradients?
-                
-                # add up value of all features to complete the gradient
-                sum_event = reduce(combine_dicts, batch)
-                
-                # update weights with the latest gradient
-                for feat_name, feat_value in sum_event.iteritems():
-                    self.weights[feat_name] = (
-                        self.weights.get(feat_name, 0.) - 
-                        (self.alpha * gradient * feat_value / n_batch)
-                    )
+                gradient = self.logloss_gradient(batch_data, batch_targets)
+                self.weights -= self.alpha * gradient
+
+                # TODO: L1 & L2
     
-            # report after every 2^(n-1) epoch and at the end of all epochs
+            # report after every 2^(n-1) epoch and at the end of training
             if (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1):
                 # evaluate holdout set w/ current weights
-                targets = np.array([event["target"] for event in holdout_set])
-                predictions = np.array([self.predict_prob(event) for event in holdout_set])
-                ll = logloss(targets, predictions)
+                ll = logloss(holdout_targets, self.predict_prob(holdout_data))
                 print(
-                    "Epoch: {epoch}, holdout_loss: {mean_loss:.3f}, normalized: {norm_mean_loss:.3f}, bias: {bias:.3f}".format(
+                    "Epoch: {epoch:<3} holdout_loss: {mean_loss:.3f} normalized: {norm_mean_loss:.3f} bias: {bias:.3f}".format(
                     epoch=1 + epoch,
                     mean_loss=ll,
-                    norm_mean_loss=normLL(ll, np.mean(targets)),
-                    bias=self.weights["bias"]
+                    norm_mean_loss=normLL(ll, np.mean(holdout_targets)),
+                    bias=self.weights[0]
                     ))
 
 
@@ -108,18 +102,13 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--minibatch', type=int, default=1, help='minibatch size')
     parser.add_argument('-e', '--epochs', type=int, default=10, help='# epochs')
     parser.add_argument('-t', '--target', type=int, help='which number to target')
+    parser.add_argument('--holdout', type=float, 
+        help='holdout proportion (0, 1.0)', default=0.2)
     args = parser.parse_args()
 
     digits = datasets.load_digits()
-    paired_data = zip(digits.data, digits.target)
-
-    def row2dict(data_row, outcome, target_val):
-        data = dict((i, val) for i,val in enumerate(data_row))
-        data["target"] = float(outcome == target_val)
-        return data
-    data = [row2dict(features, out, args.target) for features, out in paired_data]
-
+  
     model = LogisticSGD(alpha=args.alpha, minibatch=args.minibatch)
-    model.train(data, n_epochs=args.epochs)
-
+    model.train(np.array(digits.target==args.target, dtype=float), digits.data,
+        n_epochs=args.epochs, holdout_proportion=args.holdout)
     
