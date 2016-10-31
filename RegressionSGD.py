@@ -1,30 +1,7 @@
-from __future__ import print_function, division, unicode_literals
-import warnings
+from __future__ import absolute_import, print_function, division, unicode_literals
 import numpy as np
 from sklearn.model_selection import train_test_split
-
-def logloss(observed, predicted):
-    # keep loss from being infinite
-    predicted = np.clip(predicted, 1e-9, 1.0 - 1e-9)
-    return -np.mean(
-        observed * np.log(predicted) + 
-        (1. - observed) * np.log(1. - predicted)
-    )
-
-def normLL(raw_logloss, baserate):
-    ll_br = -(baserate * np.log(baserate) + (1 - baserate) * np.log(1 - baserate))
-    return 1. - (raw_logloss / ll_br)
-
-def ilogit(log_odds):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return 1. / (1. + np.exp(-log_odds))
-
-def shuffle_rows(data, targets):
-    if not data.shape[0] == len(targets):
-        raise Exception("Data and targets do not have the same number of rows.")
-    shuffle_ix = np.random.permutation(len(targets))
-    return data[shuffle_ix,:], targets[shuffle_ix]
+from util import normalize, logloss, normLL, ilogit, shuffle_rows
 
 def report(epoch, ll, br, bias):
     print(
@@ -55,7 +32,7 @@ class LogisticSGD():
 
     def logloss_gradient(self, data, targets):
         # returns the _positive_ gradient, make it negative when adjusting weights
-        predictions_diff  = self.predict_prob(data) - targets
+        predictions_diff = self.predict_prob(data) - targets
         weights_gradient = predictions_diff.dot(data) / len(targets)
         bias_gradient = np.mean(predictions_diff)
         return weights_gradient, bias_gradient
@@ -65,22 +42,31 @@ class LogisticSGD():
             yield (data[start:(start + self.minibatch), :],
                 targets[start:(start + self.minibatch)])
         
-    def train(self, data, targets, n_epochs=1, holdout_proportion=0.2):
+    def train(self, data, targets, n_epochs=1, holdout_proportion=0.2, normalize_data=False):
         # now that we have the data, we know the shape of the weight vector
         self.weights = np.zeros(data.shape[1])
         # generate holdout set
         train_data, holdout_data, train_targets, holdout_targets = train_test_split(
             data, targets, test_size=holdout_proportion)
 
+        if normalize_data:
+            train_mean = np.mean(train_data, axis=0)
+            train_std = np.std(train_data, axis=0)
+            train_data = normalize(train_data, train_mean, train_std)
+            holdout_data = normalize(holdout_data, train_mean, train_std)
+
         for epoch in range(n_epochs):
             if epoch > 0:
                 # randomize order for each epoch
                 train_data, train_targets = shuffle_rows(train_data, train_targets)
+
             for batch_data, batch_targets in self.get_minibatches(train_data, train_targets):
                 # evalute the gradient on this minibatch with the current weights
                 w_gradient, b_gradient = self.logloss_gradient(batch_data, batch_targets)
                 self.weights -= self.alpha * w_gradient
                 self.bias -= self.alpha * b_gradient
+                # TODO: add learning rate decay
+                # TODO: add momentum, rmsprop, etc.
 
                 # regularization
                 # should I be regularizing the bias?
@@ -140,9 +126,14 @@ if __name__ == "__main__":
         digits.data,
         np.array(digits.target==args.target, dtype=float),
         n_epochs=args.epochs,
-        holdout_proportion=args.holdout
+        holdout_proportion=args.holdout,
+        normalize_data=True,
     )
+
     # Compare to sklearn's equivalent models
+    print("=" * 50)
+    print("sklearn.linear_model.LogisticRegression")
+    print("-" * 50)
     (train_data, holdout_data, train_targets, holdout_targets
         ) = train_test_split(
             digits.data, 
@@ -150,9 +141,11 @@ if __name__ == "__main__":
             test_size=args.holdout
     )
 
-    print("=" * 50)
-    print("sklearn.linear_model.LogisticRegression")
-    print("-" * 50)
+    train_mean = np.mean(train_data, axis=0)
+    train_std = np.std(train_data, axis=0)
+    train_data = normalize(train_data, train_mean, train_std)
+    holdout_data = normalize(holdout_data, train_mean, train_std)
+
     # I'm using default parameters for sklearn, perhaps this is an unfair comparison?
     sklearn_logistic = LogisticRegression().fit(train_data, train_targets)
     report(
