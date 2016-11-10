@@ -40,9 +40,16 @@ def find_split(data, targets, potential_splits, leaf_only=False, max_features=No
             predictions[-split_ix] = np.mean(targets[-split_ix])
             ll = logloss(targets, predictions)
             if ll < best_split["subtree_loss"]:
+                # TODO: is there a way to assign the split somewhere in the middle
+                # when multiple splits have the same effect on the training data?
                 best_split["subtree_loss"] = ll
                 best_split["split_feature"] = i
                 best_split["split_value"] = s
+
+    if best_split["subtree_loss"] == np.inf:
+        # i.e. if no split actually separates the data
+        best_split["subtree_loss"] = logloss(targets,
+            best_split["mean_predict"] * np.ones_like(targets))
 
     return best_split
 
