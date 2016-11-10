@@ -16,7 +16,6 @@ def find_split(data, targets, potential_splits, leaf_only=False, max_features=No
         "split_feature": None,
         "split_value": None, 
         "children": [None, None],
-        # "depth": depth,
     }
     if leaf_only:
         best_split["subtree_loss"] = logloss(
@@ -104,7 +103,7 @@ class DecisionTree():
 
     def __repr__(self):
         if not self.tree:
-            raise Exception("Not trained yet.")
+            raise AttributeError("Not trained yet.")
         return json.dumps(
             (self.args_dict(), self.tree),
             indent=4, sort_keys=True)
