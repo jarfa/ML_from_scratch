@@ -8,7 +8,7 @@ def find_potential_splits(data, p=0.05):
     splits = np.percentile(data, np.arange(p * 100, 100, p * 100), axis=0)
     return dict((c, splits[:, c]) for c in range(splits.shape[1]))
 
-def find_split(data, targets, potential_splits, leaf_only=False):
+def find_split(data, targets, potential_splits, leaf_only=False, max_features=None):
     best_split = {
         "N": len(targets),
         "mean_predict": np.mean(targets),
@@ -25,8 +25,14 @@ def find_split(data, targets, potential_splits, leaf_only=False):
         )
         return best_split
 
-    for i, splits in potential_splits.iteritems():
-        for s in splits:
+    if max_features is None:
+        feature_indices = range(len(potential_splits))
+    else:
+        feature_indices = np.random.choice(len(potential_splits), max_features,
+            replace=False)
+
+    for i in feature_indices:
+        for s in potential_splits[i]:
             split_ix = (data[:,i] >= s)
             if sum(split_ix) in (0, len(split_ix)):
                 continue
@@ -43,7 +49,8 @@ def find_split(data, targets, potential_splits, leaf_only=False):
 
 class DecisionTree():
     # I'm borrowing some of the variable names from sklearn's implementation
-    def __init__(self, min_samples_split=5, loss="logloss", max_depth=None):
+    def __init__(self, min_samples_split=5, loss="logloss", max_depth=None,
+        max_features=None):
         # self.min_samples_leaf = min_samples_leaf # TODO
         self.min_samples_split = min_samples_split
         if loss != "logloss":
@@ -52,6 +59,7 @@ class DecisionTree():
         self.potential_splits = None
         self.tree = None
         self.max_depth = max_depth
+        self.max_features = max_features
 
     def _predict_event(self, event):
         subtree = self.tree
@@ -76,7 +84,7 @@ class DecisionTree():
             ) or data.shape[0] <= self.min_samples_split:
             return find_split(data, targets, None, leaf_only=True)
 
-        split = find_split(data, targets, self.potential_splits)
+        split = find_split(data, targets, self.potential_splits, max_features=self.max_features)
         split_indices = data[:,split["split_feature"]] >= split["split_value"]
         split["children"][0] = self.build_subtree(data[-split_indices, :], targets[-split_indices], depth=depth+1)
         split["children"][1] = self.build_subtree(data[split_indices, :], targets[split_indices], depth=depth+1)
@@ -89,6 +97,7 @@ class DecisionTree():
     def args_dict(self):
         return {
             "max_depth": self.max_depth,
+            "max_features": self.max_features,
             "min_samples_split": self.min_samples_split,
             "loss": self.loss,
         }
@@ -116,6 +125,7 @@ if __name__ == "__main__":
                         help='holdout proportion (0, 1.0)')
     parser.add_argument('--max_depth', type=int, default=None)
     parser.add_argument('--min_samples_split', type=int, default=20)
+    parser.add_argument("--max_features", type=int, default=None)
     args = parser.parse_args()
 
     digits = datasets.load_digits()
@@ -129,7 +139,8 @@ if __name__ == "__main__":
 
     tree = DecisionTree(
         min_samples_split=args.min_samples_split,
-        max_depth=args.max_depth)
+        max_depth=args.max_depth,
+        max_features=args.max_features)
     
     tree.train(train_data, train_targets)
     
