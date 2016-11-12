@@ -29,9 +29,12 @@ class RandomForest():
         self.tree_args = dict((k,v) for k,v in self.tree_args if v is not None)
         self.trees = []
 
-    def all_predictions(self, data):
+    def _check_forest(self):
         if not self.trees:
             raise AttributeError("Not trained yet.")
+
+    def all_predictions(self, data):
+        self._check_forest()
         return np.vstack([t.predict(data) for t in self.trees])
 
     def predict(self, data):

@@ -30,6 +30,10 @@ class RegressionTree():
         self.potential_splits = None
         self.tree = None
 
+    def _check_tree(self):
+        if not self.tree:
+            raise AttributeError("Not trained yet.")
+
     def _predict_event(self, event):
         subtree = self.tree
         while(True):
@@ -44,6 +48,7 @@ class RegressionTree():
             subtree = subtree["children"][child]    
 
     def predict(self, data):
+        self._check_tree()
         if len(data.shape) == 1 or data.shape[1] == 1:
             return self._predict_event(data)
         return np.apply_along_axis(self._predict_event, 1, data)
@@ -117,8 +122,7 @@ class RegressionTree():
         }
 
     def __repr__(self):
-        if not self.tree:
-            raise AttributeError("Not trained yet.")
+        self._check_tree()
         return json.dumps(
             (self.args_dict(), self.tree),
             indent=4, sort_keys=True)
