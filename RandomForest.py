@@ -53,7 +53,6 @@ class RandomForest():
 if __name__ == "__main__":
     import argparse
     from sklearn import datasets
-    np.random.seed(5)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--target', type=int, help='which number to target',
@@ -65,7 +64,10 @@ if __name__ == "__main__":
     parser.add_argument('--min_samples_split', type=int, default=None)
     parser.add_argument('--min_samples_leaf', type=int, default=None)
     parser.add_argument('--max_features', type=int, default=None)
+    parser.add_argument('-s', '--seed', type=int, default=5)
     args = parser.parse_args()
+
+    np.random.seed(args.seed)
 
     digits = datasets.load_digits()
     
