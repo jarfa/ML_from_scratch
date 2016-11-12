@@ -6,7 +6,9 @@ from util import logloss, normLL
 
 def find_potential_splits(data, p=0.05):
     splits = np.percentile(data, 100 * np.arange(p, 1.0, p), axis=0)
-    return dict((c, splits[:, c]) for c in range(splits.shape[1]))
+    return dict(
+        (c, np.unique(splits[:, c])) for c in range(splits.shape[1])
+    )
 
 def find_split(data, targets, potential_splits, leaf_only=False, max_features=None):
     best_split = {
