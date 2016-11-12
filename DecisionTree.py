@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from util import logloss, normLL
 
 def find_potential_splits(data, p=0.05):
-    splits = np.percentile(data, np.arange(p * 100, 100, p * 100), axis=0)
+    splits = np.percentile(data, 100 * np.arange(p, 1.0, p), axis=0)
     return dict((c, splits[:, c]) for c in range(splits.shape[1]))
 
 def find_split(data, targets, potential_splits, leaf_only=False, max_features=None):
@@ -25,29 +25,31 @@ def find_split(data, targets, potential_splits, leaf_only=False, max_features=No
         return best_split
 
     if max_features is None:
-        feature_indices = range(len(potential_splits))
-    else:
-        feature_indices = np.random.choice(len(potential_splits), max_features,
-            replace=False)
+        max_features = len(potential_splits)
+
+    # Even when max_features=None, I'm randomizing the order by which splits are
+    # considered because otherwise I'd have to worry about breaking ties between
+    # 2 splits that lead to equal loss. This change only marginally slows down the code.
+    feature_indices = np.random.choice(
+        len(potential_splits), max_features, replace=False)
 
     for i in feature_indices:
-        for s in potential_splits[i]:
+        for s in np.random.permutation(potential_splits[i]):
             split_ix = (data[:,i] >= s)
             if sum(split_ix) in (0, len(split_ix)):
+                # i.e. if splitting the data here is not a real split
                 continue
             predictions = np.zeros_like(targets)
             predictions[split_ix] = np.mean(targets[split_ix])
             predictions[-split_ix] = np.mean(targets[-split_ix])
             ll = logloss(targets, predictions)
             if ll < best_split["subtree_loss"]:
-                # TODO: is there a way to assign the split somewhere in the middle
-                # when multiple splits have the same effect on the training data?
                 best_split["subtree_loss"] = ll
                 best_split["split_feature"] = i
                 best_split["split_value"] = s
 
     if best_split["subtree_loss"] == np.inf:
-        # i.e. if no split actually separates the data
+        # i.e. if no split we considered actually separates the data
         best_split["subtree_loss"] = logloss(targets,
             best_split["mean_predict"] * np.ones_like(targets))
 
