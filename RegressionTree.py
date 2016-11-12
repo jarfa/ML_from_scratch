@@ -11,7 +11,7 @@ def find_potential_splits(data, p=0.05):
     )
 
 # I'm borrowing some of the variable names from sklearn's implementation
-class DecisionTree():
+class RegressionTree():
     def __init__(
         self,
         loss="logloss",
@@ -111,6 +111,7 @@ class DecisionTree():
         return {
             "max_depth": self.max_depth,
             "max_features": self.max_features,
+            "min_samples_leaf": self.min_samples_leaf,
             "min_samples_split": self.min_samples_split,
             "loss": self.loss,
         }
@@ -126,19 +127,17 @@ class DecisionTree():
 if __name__ == "__main__":
     import argparse
     from sklearn import datasets
-    import argparse
-    from sklearn import datasets
-    from sklearn.linear_model import LogisticRegression
     np.random.seed(5)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--target', type=int, help='which number to target')
+    parser.add_argument('-t', '--target', type=int, help='which number to target',
+                        required=True)
     parser.add_argument('--holdout', type=float, default=0.2, 
                         help='holdout proportion (0, 1.0)')
     parser.add_argument('--max_depth', type=int, default=None)
     parser.add_argument('--min_samples_split', type=int, default=20)
     parser.add_argument('--min_samples_leaf', type=int, default=10)
-    parser.add_argument("--max_features", type=int, default=None)
+    parser.add_argument('--max_features', type=int, default=None)
     args = parser.parse_args()
 
     digits = datasets.load_digits()
@@ -150,7 +149,7 @@ if __name__ == "__main__":
             test_size=args.holdout
     )
 
-    tree = DecisionTree(
+    tree = RegressionTree(
         min_samples_leaf=args.min_samples_leaf,
         min_samples_split=args.min_samples_split,
         max_depth=args.max_depth,
