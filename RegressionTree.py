@@ -1,8 +1,9 @@
 from __future__ import absolute_import, print_function, division, unicode_literals
 import json
+from time import time
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import logloss, normLL
+from util import logloss, normLL, report
 
 def find_potential_splits(data, p=0.05):
     splits = np.percentile(data, 100 * np.arange(p, 1.0, p), axis=0)
@@ -30,7 +31,7 @@ class RegressionTree():
         self.potential_splits = None
         self.tree = None
 
-    def _check_tree(self):
+    def _check_trained(self):
         if not self.tree:
             raise AttributeError("Not trained yet.")
 
@@ -48,7 +49,7 @@ class RegressionTree():
             subtree = subtree["children"][child]    
 
     def predict(self, data):
-        self._check_tree()
+        self._check_trained()
         if len(data.shape) == 1 or data.shape[1] == 1:
             return self._predict_event(data)
         return np.apply_along_axis(self._predict_event, 1, data)
@@ -103,14 +104,21 @@ class RegressionTree():
             return split
         split_indices = data[:,split["split_feature"]] >= split["split_value"]
         if sum(-split_indices) >= self.min_samples_leaf:
-            split["children"][0] = self.build_subtree(data[-split_indices, :], targets[-split_indices], depth=depth+1)
+            split["children"][0] = self.build_subtree(
+                data[-split_indices, :], targets[-split_indices], depth=depth+1)
         if sum(split_indices) >= self.min_samples_leaf:
-            split["children"][1] = self.build_subtree(data[split_indices, :], targets[split_indices], depth=depth+1)
+            split["children"][1] = self.build_subtree(
+                data[split_indices, :], targets[split_indices], depth=depth+1)
         return split
 
     def train(self, data, targets):
         self.potential_splits = find_potential_splits(data, p=0.05)
+        # build the tree recursively, depth-first
         self.tree = self.build_subtree(data, targets, depth=0)
+
+    def var_importance(self):
+        self._check_trained()
+        raise NotImplementedError() # TODO
 
     def args_dict(self):
         return {
@@ -122,7 +130,7 @@ class RegressionTree():
         }
 
     def __repr__(self):
-        self._check_tree()
+        self._check_trained()
         return json.dumps(
             (self.args_dict(), self.tree),
             indent=4, sort_keys=True)
@@ -155,6 +163,7 @@ if __name__ == "__main__":
             test_size=args.holdout
     )
 
+    start_tree_train = time()
     tree = RegressionTree(
         min_samples_leaf=args.min_samples_leaf,
         min_samples_split=args.min_samples_split,
@@ -162,10 +171,35 @@ if __name__ == "__main__":
         max_features=args.max_features)
     
     tree.train(train_data, train_targets)
-    
-    holdout_ll = logloss(holdout_targets, tree.predict(holdout_data))
-    print(
-        "Norm LL: {nll}".format(
-            nll=normLL(holdout_ll, np.mean(holdout_targets))
-            )
+    end_tree_train = time()
+
+    tree_pred = tree.predict(holdout_data)
+    end_tree_pred = time()
+    holdout_ll = logloss(holdout_targets, tree_pred)
+    report("from scratch",
+        end_tree_train - start_tree_train,
+        end_tree_pred - end_tree_train,
+        normLL(holdout_ll, np.mean(holdout_targets))
+    )
+
+    # Compare to sklearn's implementation
+    start_skl_train = time()
+    skl_forest = RandomForestClassifier(
+        n_estimators=args.num_trees,
+        criterion="entropy",
+        max_depth=args.max_depth,
+        min_samples_split=args.min_samples_split or 20,
+        min_samples_leaf=args.min_samples_leaf or 10,
+        max_features=args.max_features,
+        )
+    skl_forest.fit(train_data, train_targets)
+    end_skl_train = time()
+
+    skl_pred = skl_forest.predict_proba(holdout_data)[:,1]
+    end_skl_pred = time()
+    skl_ll = logloss(holdout_targets, skl_pred)
+    report("scikit-learn ({})".format(metric),
+        end_skl_train - start_skl_train,
+        end_skl_pred - end_skl_train,
+        normLL(skl_ll, np.mean(holdout_targets))
     )
