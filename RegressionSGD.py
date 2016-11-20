@@ -1,4 +1,5 @@
 from __future__ import absolute_import, print_function, division, unicode_literals
+import json
 import numpy as np
 from sklearn.model_selection import train_test_split
 from util import normalize, logloss, normLL, ilogit, shuffle_rows
@@ -13,29 +14,29 @@ def report(epoch, ll, br, bias):
     ))
 
 class LogisticSGD():
-    def __init__(self, alpha, minibatch=1, weight_init="zero", l1=0, l2=0):
-        if weight_init != "zero":
+    def __init__(self, learning_rate, minibatch=1, coef_init="zero", l1=0, l2=0):
+        if coef_init != "zero":
             raise NotImplementedError("Weights can only be initialized at zero for now.")
-        self.alpha = alpha
+        self.learning_rate = learning_rate
         self.minibatch = minibatch
-        self.weight_init = weight_init
-        self.weights = None
+        self.coef_init = coef_init
+        self.coefs = None
         self.bias = 0.0
         self.l1 = l1
         self.l2 = l2
 
-    def predict(self, events):
-        return self.bias + events.dot(self.weights)
+    def predict(self, data):
+        return self.bias + data.dot(self.coefs)
 
-    def predict_prob(self, events):
-        return ilogit(self.predict(events))
+    def predict_prob(self, data):
+        return ilogit(self.predict(data))
 
     def logloss_gradient(self, data, targets):
-        # returns the _positive_ gradient, make it negative when adjusting weights
+        # returns the _positive_ gradient, make it negative when adjusting coefs
         predictions_diff = self.predict_prob(data) - targets
-        weights_gradient = predictions_diff.dot(data) / len(targets)
+        coefs_gradient = predictions_diff.dot(data) / len(targets)
         bias_gradient = np.mean(predictions_diff)
-        return weights_gradient, bias_gradient
+        return coefs_gradient, bias_gradient
 
     def get_minibatches(self, data, targets):
         for start in range(0, len(targets), self.minibatch):
@@ -44,7 +45,7 @@ class LogisticSGD():
         
     def train(self, data, targets, n_epochs=1, holdout_proportion=0.2, normalize_data=False):
         # now that we have the data, we know the shape of the weight vector
-        self.weights = np.zeros(data.shape[1])
+        self.coefs = np.zeros(data.shape[1])
         # generate holdout set
         train_data, holdout_data, train_targets, holdout_targets = train_test_split(
             data, targets, test_size=holdout_proportion)
@@ -61,27 +62,27 @@ class LogisticSGD():
                 train_data, train_targets = shuffle_rows(train_data, train_targets)
 
             for batch_data, batch_targets in self.get_minibatches(train_data, train_targets):
-                # evalute the gradient on this minibatch with the current weights
+                # evalute the gradient on this minibatch with the current coefs
                 w_gradient, b_gradient = self.logloss_gradient(batch_data, batch_targets)
-                self.weights -= self.alpha * w_gradient
-                self.bias -= self.alpha * b_gradient
+                self.coefs -= self.learning_rate * w_gradient
+                self.bias -= self.learning_rate * b_gradient
                 # TODO: add learning rate decay
                 # TODO: add momentum, rmsprop, etc.
 
                 # regularization
                 # should I be regularizing the bias?
                 if self.l2:
-                    self.weights -= 2. * self.l2 * self.weights
+                    self.coefs -= 2. * self.l2 * self.coefs
                     self.bias -= 2. * self.l2 * self.bias
                 if self.l1:
-                    self.weights = np.sign(self.weights) * np.maximum(
-                        0.0, np.absolute(self.weights) - self.l1)
+                    self.coefs = np.sign(self.coefs) * np.maximum(
+                        0.0, np.absolute(self.coefs) - self.l1)
                     self.bias = np.sign(self.bias) * np.maximum(
                         0.0, np.absolute(self.bias) - self.l1)
 
             # report after every 2^(n-1) epoch and at the end of training
             if (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1):
-                # evaluate holdout set w/ current weights
+                # evaluate holdout set w/ current coefs
                 holdout_ll = logloss(holdout_targets, self.predict_prob(holdout_data))
                 report(
                     epoch=1 + epoch,
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     np.random.seed(5)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--alpha', type=float, default=0.01, help='step size')
+    parser.add_argument('-l', '--learning_rate', type=float, default=0.01, help='step size')
     parser.add_argument('-m', '--minibatch', type=int, default=1, help='minibatch size')
     parser.add_argument('-e', '--epochs', type=int, default=10, help='# epochs')
     parser.add_argument('-t', '--target', type=int, help='which number to target')
@@ -113,11 +114,10 @@ if __name__ == "__main__":
     digits = datasets.load_digits()
   
     print("=" * 50)
-    print("My model, args: [{}]".format(", ".join(
-        ["{}: {}".format(k,v) for k,v in args.__dict__.items()])))
+    print("My model, args: {}".format(json.dumps(args.__dict__, sort_keys=True)))
     print("-" * 50)
     model = LogisticSGD(
-        alpha=args.alpha,
+        learning_rate=args.learning_rate,
         minibatch=args.minibatch,
         l1=args.l1,
         l2=args.l2,
