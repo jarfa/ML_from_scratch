@@ -1,7 +1,7 @@
 from __future__ import absolute_import, print_function, division, unicode_literals
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import logloss, normLL
+from util import logloss, normLL, report
 from RegressionTree import RegressionTree
 
 
@@ -14,6 +14,7 @@ class RandomForest():
         min_samples_split=None,
         max_depth=None,
         max_features=None):
+
         self.num_trees = num_trees
         if loss != "logloss":
             raise NotImplementedError("Need to make more loss functions")
@@ -29,16 +30,20 @@ class RandomForest():
         self.tree_args = dict((k,v) for k,v in self.tree_args if v is not None)
         self.trees = []
 
-    def _check_forest(self):
+    def _check_trained(self):
         if not self.trees:
             raise AttributeError("Not trained yet.")
 
     def all_predictions(self, data):
-        self._check_forest()
+        self._check_trained()
         return np.vstack([t.predict(data) for t in self.trees])
 
     def predict(self, data):
-        return self.all_predictions(data).mean(axis=0)
+        pred = self.all_predictions(data)
+        r, c = pred.shape
+        if r == 1:
+            return pred.reshape(c)
+        return pred.mean(axis=0)
 
     # TODO: return more than just the mean prediction - confidence intervals, etc.
 
@@ -55,7 +60,9 @@ class RandomForest():
 
 if __name__ == "__main__":
     import argparse
+    from time import time
     from sklearn import datasets
+    from sklearn.ensemble import RandomForestClassifier
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--target', type=int, help='which number to target',
@@ -80,7 +87,7 @@ if __name__ == "__main__":
             np.array(digits.target==args.target, dtype=float),
             test_size=args.holdout
     )
-
+    start_forest_train = time()
     forest = RandomForest(
         num_trees=args.num_trees,
         min_samples_leaf=args.min_samples_leaf,
@@ -89,10 +96,35 @@ if __name__ == "__main__":
         max_features=args.max_features)
     
     forest.train(train_data, train_targets)
+    end_forest_train = time()
+
+    forest_pred = forest.predict(holdout_data)
+    end_forest_pred = time()
+    holdout_ll = logloss(holdout_targets, forest_pred)
+    report("from scratch",
+        end_forest_train - start_forest_train,
+        end_forest_pred - end_forest_train,
+        normLL(holdout_ll, np.mean(holdout_targets))
+    )
+
+    # Compare to sklearn's implementation
+    start_skl_train = time()
+    skl_forest = RandomForestClassifier(
+        n_estimators=args.num_trees,
+        criterion="entropy",
+        max_depth=args.max_depth,
+        min_samples_split=args.min_samples_split or 20,
+        min_samples_leaf=args.min_samples_leaf or 10,
+        max_features=args.max_features,
+        )
+    skl_forest.fit(train_data, train_targets)
+    end_skl_train = time()
     
-    holdout_ll = logloss(holdout_targets, forest.predict(holdout_data))
-    print(
-        "Norm LL: {nll}".format(
-            nll=normLL(holdout_ll, np.mean(holdout_targets))
-            )
+    skl_pred = skl_forest.predict_proba(holdout_data)[:,1]
+    end_skl_pred = time()
+    skl_ll = logloss(holdout_targets, skl_pred)
+    report("scikit-learn",
+        end_skl_train - start_skl_train,
+        end_skl_pred - end_skl_train,
+        normLL(skl_ll, np.mean(holdout_targets))
     )
