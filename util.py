@@ -28,6 +28,9 @@ def normLL(raw_logloss, baserate):
     ll_br = -(baserate * np.log(baserate) + (1 - baserate) * np.log(1 - baserate))
     return 1. - (raw_logloss / ll_br)
 
+def logit(prob):
+    return np.log(prob / (1.0 - prob))
+
 def ilogit(log_odds):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -38,3 +41,12 @@ def shuffle_rows(data, targets):
         raise Exception("Data and targets do not have the same number of rows.")
     shuffle_ix = np.random.permutation(len(targets))
     return data[shuffle_ix,:], targets[shuffle_ix]
+
+def report(model_name, train_time, pred_time, nll):
+    line = "\t".join([
+        "{mod: <25}".format(mod=model_name),
+        "norm LL: {nll:.3f}".format(nll=nll),
+        "train time: {train:.3f}s".format(train=train_time),
+        "pred time: {pred:.3f}s".format(pred=pred_time),
+    ])
+    print(line)
