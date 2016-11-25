@@ -96,7 +96,6 @@ if __name__ == "__main__":
     import argparse
     from sklearn import datasets
     from sklearn.linear_model import LogisticRegression
-    np.random.seed(5)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--learning_rate', type=float, default=0.01, help='step size')
@@ -107,7 +106,10 @@ if __name__ == "__main__":
                         help='holdout proportion (0, 1.0)')
     parser.add_argument('--l1', type=float, default=0.0, help="L1 Regularization")
     parser.add_argument('--l2', type=float, default=0.0, help="L2 Regularization")
+    parser.add_argument('-s', '--seed', type=int, default=5)
     args = parser.parse_args()
+
+    np.random.seed(args.seed)
 
     # We're using the digits data, choosing 1 digit as the target
     # and the rest as non-targets.
