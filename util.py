@@ -11,6 +11,7 @@ def normalize(data, mean=None, sd=None):
         warnings.simplefilter("ignore")
         normalized = np.divide(data - mean, sd)
     normalized[np.isnan(normalized)] = 0.0
+    normalized[np.isinf(normalized)] = 0.0
     return normalized
 
 def L2_loss(predicted, observed):
@@ -44,7 +45,7 @@ def shuffle_rows(data, targets):
 
 def report(model_name, train_time, pred_time, nll):
     line = "\t".join([
-        "{mod: <25}".format(mod=model_name),
+        "{mod: <25}".format(mod=model_name or ""),
         "norm LL: {nll:.3f}".format(nll=nll),
         "train time: {train:.3f}s".format(train=train_time),
         "pred time: {pred:.3f}s".format(pred=pred_time),
