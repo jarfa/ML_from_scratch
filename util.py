@@ -14,9 +14,6 @@ def normalize(data, mean=None, sd=None):
     normalized[np.isinf(normalized)] = 0.0
     return normalized
 
-def L2_loss(predicted, observed):
-    return np.sqrt(np.mean(np.square(predicted - observed)))
-
 def logloss(observed, predicted, trim=1e-9):
     # keep loss from being infinite
     predicted = np.clip(predicted, trim, 1.0 - trim)

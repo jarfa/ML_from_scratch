@@ -16,18 +16,16 @@ class RandomForest():
         max_features=None):
 
         self.num_trees = num_trees
-        if loss != "logloss":
-            raise NotImplementedError("Need to make more loss functions")
-        self.loss = loss
         # format args for subsidiary trees nicely, drop those that aren't specified
         # so that the default RegressionTree args can be used
-        self.tree_args = [
+        all_args = [
+            ("loss", loss),
             ("min_samples_leaf", min_samples_leaf),
             ("min_samples_split", min_samples_split),
             ("max_depth", max_depth),
             ("max_features", max_features),
         ]
-        self.tree_args = dict((k,v) for k,v in self.tree_args if v is not None)
+        self.tree_args = dict((k,v) for k,v in all_args if v is not None)
         self.trees = []
 
     def _check_trained(self):
@@ -45,7 +43,7 @@ class RandomForest():
             return pred.reshape(c)
         return pred.mean(axis=0)
 
-    # TODO: return more than just the mean prediction - confidence intervals, etc.
+    # TODO: return more than just the mean prediction - confidence intervals?
 
     def _train_one(self, data, targets):
         bootstrap_indices = np.random.randint(len(targets), size=len(targets))
@@ -67,6 +65,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--target', type=int, help='which number to target',
                         required=True)
+    parser.add_argument('--loss', choices=['logloss', 'l2'], default='logloss')
     parser.add_argument('--holdout', type=float, default=0.2, 
                         help='holdout proportion (0, 1.0)')
     parser.add_argument('-n', '--num_trees', type=int, required=True)
@@ -89,6 +88,7 @@ if __name__ == "__main__":
     )
     start_forest_train = time()
     forest = RandomForest(
+        loss=args.loss,
         num_trees=args.num_trees,
         min_samples_leaf=args.min_samples_leaf,
         min_samples_split=args.min_samples_split,

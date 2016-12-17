@@ -3,18 +3,33 @@ import json
 import numpy as np
 from sklearn.model_selection import train_test_split
 from util import normalize, logloss, normLL, ilogit, shuffle_rows
+from loss import Logistic, L2
 
-def report(epoch, ll, br, bias):
+def sgd_report(epoch, loss, br, bias):
     print(
-        "Epoch: {epoch:<3} holdout_loss: {mean_loss:.3f} normalized: {norm_loss:.3f} bias: {bias:.3f}".format(
+        "Epoch: {epoch:<3} holdout_loss: {mean_loss:.3f} normalized: {norm_loss:<6} bias: {bias:.3f}".format(
         epoch=epoch,
-        mean_loss=ll,
-        norm_loss=normLL(ll, br),
+        mean_loss=loss,
+        norm_loss="%.3f" % normLL(loss, br) if br else "",
         bias=bias
     ))
 
-class LogisticSGD():
-    def __init__(self, learning_rate, minibatch=1, coef_init="zero", l1=0, l2=0):
+class RegressionSGD():
+    def __init__(
+        self,
+        learning_rate,
+        loss="logloss",
+        minibatch=1,
+        coef_init="zero",
+        l1=0,
+        l2=0,
+        ):
+        if loss.lower() == "logloss":
+            self.loss = Logistic()
+        elif loss.lower() == "l2":
+            self.loss = L2()
+        else:
+            raise Exception("Loss argument {} not recognized.".format(loss))
         if coef_init != "zero":
             raise NotImplementedError("Weights can only be initialized at zero for now.")
         self.learning_rate = learning_rate
@@ -29,21 +44,18 @@ class LogisticSGD():
         return self.bias + data.dot(self.coefs)
 
     def predict_prob(self, data):
-        return ilogit(self.predict(data))
-
-    def logloss_gradient(self, data, targets):
-        # returns the _positive_ gradient, make it negative when adjusting coefs
-        predictions_diff = self.predict_prob(data) - targets
-        coefs_gradient = predictions_diff.dot(data) / len(targets)
-        bias_gradient = np.mean(predictions_diff)
-        return coefs_gradient, bias_gradient
+        if isinstance(self.loss, Logistic):
+            return ilogit(self.predict(data))
+        else:
+            raise Exception("predict_prob is only defined for log loss")
 
     def get_minibatches(self, data, targets):
         for start in range(0, len(targets), self.minibatch):
             yield (data[start:(start + self.minibatch), :],
                 targets[start:(start + self.minibatch)])
         
-    def train(self, data, targets, n_epochs=1, holdout_proportion=0.2, normalize_data=False):
+    def train(self, data, targets, n_epochs=1, holdout_proportion=0.2,
+        normalize_data=False):
         # now that we have the data, we know the shape of the weight vector
         self.coefs = np.zeros(data.shape[1])
         # generate holdout set
@@ -63,7 +75,8 @@ class LogisticSGD():
 
             for batch_data, batch_targets in self.get_minibatches(train_data, train_targets):
                 # evalute the gradient on this minibatch with the current coefs
-                w_gradient, b_gradient = self.logloss_gradient(batch_data, batch_targets)
+                w_gradient, b_gradient = self.loss.gradient(batch_data,
+                                            self.predict(batch_data), batch_targets)
                 self.coefs -= self.learning_rate * w_gradient
                 self.bias -= self.learning_rate * b_gradient
                 # TODO: add learning rate decay
@@ -83,11 +96,12 @@ class LogisticSGD():
             # report after every 2^(n-1) epoch and at the end of training
             if (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1):
                 # evaluate holdout set w/ current coefs
-                holdout_ll = logloss(holdout_targets, self.predict_prob(holdout_data))
-                report(
+                holdout_loss = self.loss.loss(holdout_targets,
+                                    self.predict(holdout_data))
+                sgd_report(
                     epoch=1 + epoch,
-                    ll=holdout_ll,
-                    br=np.mean(holdout_targets),
+                    loss=holdout_loss,
+                    br=np.mean(holdout_targets) if isinstance(self.loss, Logistic) else "",
                     bias=self.bias
                 )
 
@@ -99,6 +113,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--learning_rate', type=float, default=0.01, help='step size')
+    parser.add_argument('--loss', choices=['logloss', 'l2'], default='logloss')
     parser.add_argument('-m', '--minibatch', type=int, default=1, help='minibatch size')
     parser.add_argument('-e', '--epochs', type=int, default=10, help='# epochs')
     parser.add_argument('-t', '--target', type=int, help='which number to target')
@@ -114,12 +129,13 @@ if __name__ == "__main__":
     # We're using the digits data, choosing 1 digit as the target
     # and the rest as non-targets.
     digits = datasets.load_digits()
-  
+
     print("=" * 50)
     print("My model, args: {}".format(json.dumps(args.__dict__, sort_keys=True)))
     print("-" * 50)
-    model = LogisticSGD(
+    model = RegressionSGD(
         learning_rate=args.learning_rate,
+        loss=args.loss,
         minibatch=args.minibatch,
         l1=args.l1,
         l2=args.l2,
@@ -136,13 +152,14 @@ if __name__ == "__main__":
     print("=" * 50)
     print("sklearn.linear_model.LogisticRegression")
     print("-" * 50)
+    # sklearn needs train/test split and normalization to be done
+    # outside of the model
     (train_data, holdout_data, train_targets, holdout_targets
         ) = train_test_split(
             digits.data, 
             np.array(digits.target==args.target, dtype=float),
             test_size=args.holdout
     )
-
     train_mean = np.mean(train_data, axis=0)
     train_std = np.std(train_data, axis=0)
     train_data = normalize(train_data, train_mean, train_std)
@@ -150,9 +167,9 @@ if __name__ == "__main__":
 
     # I'm using default parameters for sklearn, perhaps this is an unfair comparison?
     sklearn_logistic = LogisticRegression().fit(train_data, train_targets)
-    report(
+    sgd_report(
         epoch=sklearn_logistic.n_iter_[0],
-        ll=logloss(holdout_targets,
+        loss=logloss(holdout_targets,
             sklearn_logistic.predict_proba(holdout_data)[:,1]),
         br=np.mean(holdout_targets),
         bias=sklearn_logistic.intercept_[0]

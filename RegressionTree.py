@@ -4,6 +4,7 @@ from time import time
 import numpy as np
 from sklearn.model_selection import train_test_split
 from util import logloss, normLL, report
+from loss import Logistic_no_transform, L2
 
 def find_potential_splits(data, p=0.05):
     splits = np.percentile(data, 100 * np.arange(p, 1.0, p), axis=0)
@@ -23,9 +24,12 @@ class RegressionTree():
         ):
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_split = max(min_samples_split, min_samples_leaf)
-        if loss != "logloss":
-            raise NotImplementedError("Need to make more loss functions")
-        self.loss = loss
+        if loss.lower() == "logloss":
+            self.loss = Logistic_no_transform()
+        elif loss.lower() == "l2":
+            self.loss = L2()
+        else:
+            raise Exception("Loss argument {} not recognized.".format(loss))
         self.max_depth = max_depth
         self.max_features = max_features
         self.potential_splits = None
@@ -59,8 +63,9 @@ class RegressionTree():
         best_split = {
             "N": len(targets),
             "mean_predict": mean_predict,
-            # if no split can beat logloss(baserate_predictor), don't consider it
-            "subtree_loss": logloss(targets, mean_predict * np.ones_like(targets)),
+            # if no split can beat loss(baserate_predictor), don't consider it
+            "subtree_loss": self.loss.loss(
+                targets, mean_predict * np.ones_like(targets)),
             "split_feature": None,
             "split_value": None,
             "children": [None, None],
@@ -86,9 +91,9 @@ class RegressionTree():
                 predictions = np.zeros_like(targets)
                 predictions[split_ix] = np.mean(targets[split_ix])
                 predictions[-split_ix] = np.mean(targets[-split_ix])
-                ll = logloss(targets, predictions)
-                if ll < best_split["subtree_loss"]:
-                    best_split["subtree_loss"] = ll
+                s_loss = self.loss.loss(targets, predictions)
+                if s_loss < best_split["subtree_loss"]:
+                    best_split["subtree_loss"] = s_loss
                     best_split["split_feature"] = i
                     best_split["split_value"] = s
 
@@ -126,7 +131,7 @@ class RegressionTree():
             "max_features": self.max_features,
             "min_samples_leaf": self.min_samples_leaf,
             "min_samples_split": self.min_samples_split,
-            "loss": self.loss,
+            "loss": self.loss.name,
         }
 
     def __repr__(self):
@@ -144,6 +149,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--target', type=int, help='which number to target',
                         required=True)
+    parser.add_argument('--loss', choices=['logloss', 'l2'], default='logloss')
     parser.add_argument('--holdout', type=float, default=0.2, 
                         help='holdout proportion (0, 1.0)')
     parser.add_argument('--max_depth', type=int, default=None)
@@ -166,6 +172,7 @@ if __name__ == "__main__":
 
     start_tree_train = time()
     tree = RegressionTree(
+        loss=args.loss,
         min_samples_leaf=args.min_samples_leaf,
         min_samples_split=args.min_samples_split,
         max_depth=args.max_depth,
