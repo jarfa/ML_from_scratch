@@ -14,6 +14,7 @@ def sgd_report(epoch, loss, br, bias):
         bias=bias
     ))
 
+
 class RegressionSGD():
     def __init__(
         self,
@@ -29,7 +30,7 @@ class RegressionSGD():
         elif loss.lower() == "l2":
             self.loss = L2()
         else:
-            raise Exception("Loss argument {} not recognized.".format(loss))
+            raise ValueError("Loss argument {} not recognized.".format(loss))
         if coef_init != "zero":
             raise NotImplementedError("Weights can only be initialized at zero for now.")
         self.learning_rate = learning_rate
@@ -83,15 +84,12 @@ class RegressionSGD():
                 # TODO: add momentum, rmsprop, etc.
 
                 # regularization
-                # should I be regularizing the bias?
+                # I'm not regularizing the bias parameter
                 if self.l2:
                     self.coefs -= 2. * self.l2 * self.coefs
-                    self.bias -= 2. * self.l2 * self.bias
                 if self.l1:
                     self.coefs = np.sign(self.coefs) * np.maximum(
                         0.0, np.absolute(self.coefs) - self.l1)
-                    self.bias = np.sign(self.bias) * np.maximum(
-                        0.0, np.absolute(self.bias) - self.l1)
 
             # report after every 2^(n-1) epoch and at the end of training
             if (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1):
