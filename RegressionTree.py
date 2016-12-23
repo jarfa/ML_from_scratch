@@ -58,6 +58,12 @@ class RegressionTree():
             return self._predict_event(data)
         return np.apply_along_axis(self._predict_event, 1, data)
 
+    def predict_proba(self, data):
+        # This implementation doesn't need a separate predict_proba
+        # method, but I'm adding it to make let my demonstration
+        # code have an easier time looping through models
+        return self.predict(data)
+
     def find_split(self, data, targets, leaf_only=False):
         mean_predict = np.mean(targets)
         best_split = {

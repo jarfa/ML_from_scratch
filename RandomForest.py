@@ -43,7 +43,11 @@ class RandomForest():
             return pred.reshape(c)
         return pred.mean(axis=0)
 
-    # TODO: return more than just the mean prediction - confidence intervals?
+    def predict_proba(self, data):
+        # This implementation doesn't need a separate predict_proba
+        # method, but I'm adding it to make let my demonstration
+        # code have an easier time looping through models
+        return self.predict(data)
 
     def _train_one(self, data, targets):
         bootstrap_indices = np.random.randint(len(targets), size=len(targets))

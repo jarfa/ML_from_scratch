@@ -52,7 +52,7 @@ class RegressionSGD():
     def predict(self, data):
         return self.bias + data.dot(self.coefs)
 
-    def predict_prob(self, data):
+    def predict_proba(self, data):
         if isinstance(self.loss, Logistic):
             return ilogit(self.predict(data))
         else:
