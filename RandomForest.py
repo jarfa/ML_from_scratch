@@ -1,7 +1,7 @@
 from __future__ import absolute_import, print_function, division, unicode_literals
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import logloss, normLL, report
+from util import logloss, normLL, roc_auc, report
 from RegressionTree import RegressionTree
 
 
@@ -104,7 +104,8 @@ if __name__ == "__main__":
     report("from scratch",
         end_forest_train - start_forest_train,
         end_forest_pred - end_forest_train,
-        normLL(holdout_ll, np.mean(holdout_targets))
+        normLL=normLL(holdout_ll, np.mean(holdout_targets)),
+        roc_auc=roc_auc(holdout_targets, forest_pred)
     )
 
     # Compare to sklearn's implementation
@@ -126,5 +127,6 @@ if __name__ == "__main__":
     report("scikit-learn",
         end_skl_train - start_skl_train,
         end_skl_pred - end_skl_train,
-        normLL(skl_ll, np.mean(holdout_targets))
+        normLL=normLL(skl_ll, np.mean(holdout_targets)),
+        roc_auc=roc_auc(holdout_targets, skl_pred)
     )

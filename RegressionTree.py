@@ -3,7 +3,7 @@ import json
 from time import time
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import logloss, normLL, report
+from util import logloss, normLL, roc_auc, report
 from loss import Logistic_no_transform, L2
 
 def find_potential_splits(data, p=0.05):
@@ -29,7 +29,7 @@ class RegressionTree():
         elif loss.lower() == "l2":
             self.loss = L2()
         else:
-            raise Exception("Loss argument {} not recognized.".format(loss))
+            raise ValueError("Loss argument {} not recognized.".format(loss))
         self.max_depth = max_depth
         self.max_features = max_features
         self.potential_splits = None
@@ -187,7 +187,8 @@ if __name__ == "__main__":
     report("Tree (from scratch)",
         end_tree_train - start_tree_train,
         end_tree_pred - end_tree_train,
-        normLL(holdout_ll, np.mean(holdout_targets))
+        normLL=normLL(holdout_ll, np.mean(holdout_targets)),
+        roc_auc=roc_auc(holdout_targets, tree_pred)
     )
 
     # Compare to sklearn's implementation
@@ -208,5 +209,6 @@ if __name__ == "__main__":
     report("sklearn.tree.DecisionTreeClassifier",
         end_skl_train - start_skl_train,
         end_skl_pred - end_skl_train,
-        normLL(skl_ll, np.mean(holdout_targets))
+        normLL=normLL(skl_ll, np.mean(holdout_targets)),
+        roc_auc=roc_auc(holdout_targets, skl_pred)
     )
