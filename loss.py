@@ -1,12 +1,14 @@
 import numpy as np
 from util import logloss, ilogit
 
-class Loss():
+class Loss(object):
+    @staticmethod
     def loss(observed, predicted):
-        pass
+        raise NotImplementedError
 
+    @staticmethod
     def gradient(data, pred, targets):
-        pass
+        raise NotImplementedError
 
 class Logistic(Loss):
     name = "LogLoss"
