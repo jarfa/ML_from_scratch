@@ -24,6 +24,7 @@ class RegressionSGD():
         coef_init="zero",
         l1=0,
         l2=0,
+        verbose=True,
         ):
         if loss.lower() == "logloss":
             self.loss = Logistic()
@@ -40,6 +41,7 @@ class RegressionSGD():
         self.bias = 0.0
         self.l1 = l1
         self.l2 = l2
+        self.verbose = verbose
 
     def predict(self, data):
         return self.bias + data.dot(self.coefs)
@@ -67,7 +69,8 @@ class RegressionSGD():
             train_mean = np.mean(train_data, axis=0)
             train_std = np.std(train_data, axis=0)
             train_data = normalize(train_data, train_mean, train_std)
-            holdout_data = normalize(holdout_data, train_mean, train_std)
+            if holdout_proportion:
+                holdout_data = normalize(holdout_data, train_mean, train_std)
 
         for epoch in range(n_epochs):
             if epoch > 0:
@@ -92,7 +95,9 @@ class RegressionSGD():
                         0.0, np.absolute(self.coefs) - self.l1)
 
             # report after every 2^(n-1) epoch and at the end of training
-            if (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1):
+            if self.verbose and holdout_proportion and (
+                (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1)
+                ):
                 # evaluate holdout set w/ current coefs
                 holdout_loss = self.loss.loss(holdout_targets,
                                     self.predict(holdout_data))
@@ -137,6 +142,7 @@ if __name__ == "__main__":
         minibatch=args.minibatch,
         l1=args.l1,
         l2=args.l2,
+        verbose=True,
     )
     model.train(
         digits.data,
