@@ -25,6 +25,9 @@ class RegressionSGD():
         l1=0,
         l2=0,
         verbose=True,
+        n_epochs=1,
+        holdout_proportion=0.2,
+        normalize_data=False,
         ):
         if loss.lower() == "logloss":
             self.loss = Logistic()
@@ -42,6 +45,9 @@ class RegressionSGD():
         self.l1 = l1
         self.l2 = l2
         self.verbose = verbose
+        self.n_epochs = n_epochs
+        self.holdout_proportion = holdout_proportion
+        self.normalize_data = normalize_data
 
     def predict(self, data):
         return self.bias + data.dot(self.coefs)
@@ -57,22 +63,21 @@ class RegressionSGD():
             yield (data[start:(start + self.minibatch), :],
                 targets[start:(start + self.minibatch)])
         
-    def train(self, data, targets, n_epochs=1, holdout_proportion=0.2,
-        normalize_data=False):
+    def train(self, data, targets):
         # now that we have the data, we know the shape of the weight vector
         self.coefs = np.zeros(data.shape[1])
         # generate holdout set
         train_data, holdout_data, train_targets, holdout_targets = train_test_split(
-            data, targets, test_size=holdout_proportion)
+            data, targets, test_size=self.holdout_proportion)
 
-        if normalize_data:
+        if self.normalize_data:
             train_mean = np.mean(train_data, axis=0)
             train_std = np.std(train_data, axis=0)
             train_data = normalize(train_data, train_mean, train_std)
-            if holdout_proportion:
+            if self.holdout_proportion:
                 holdout_data = normalize(holdout_data, train_mean, train_std)
 
-        for epoch in range(n_epochs):
+        for epoch in range(self.n_epochs):
             if epoch > 0:
                 # randomize order for each epoch
                 train_data, train_targets = shuffle_rows(train_data, train_targets)
@@ -95,8 +100,8 @@ class RegressionSGD():
                         0.0, np.absolute(self.coefs) - self.l1)
 
             # report after every 2^(n-1) epoch and at the end of training
-            if self.verbose and holdout_proportion and (
-                (epoch & (epoch - 1)) == 0 or epoch == (n_epochs - 1)
+            if self.verbose and self.holdout_proportion and (
+                (epoch & (epoch - 1)) == 0 or epoch == (self.n_epochs - 1)
                 ):
                 # evaluate holdout set w/ current coefs
                 holdout_loss = self.loss.loss(holdout_targets,
@@ -143,13 +148,13 @@ if __name__ == "__main__":
         l1=args.l1,
         l2=args.l2,
         verbose=True,
-    )
-    model.train(
-        digits.data,
-        np.array(digits.target==args.target, dtype=float),
         n_epochs=args.epochs,
         holdout_proportion=args.holdout,
         normalize_data=True,
+    )
+    model.train(
+        digits.data,
+        np.array(digits.target==args.target, dtype=float)
     )
 
     # Compare to sklearn's equivalent models
