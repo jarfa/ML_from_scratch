@@ -23,8 +23,6 @@ def data_to_norm(N):
 class Test_normalize(unittest.TestCase):
     def test_norm_no_params(self):
         data = data_to_norm(20)
-        means = np.mean(data, axis=0)
-        stdevs = np.std(data, axis=0)
         normed = normalize(data)
         # comparing numpy arrays with the unittest module is a bit ugly
         self.assertListEqual(
