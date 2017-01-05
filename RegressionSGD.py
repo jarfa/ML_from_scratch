@@ -117,7 +117,7 @@ class RegressionSGD():
 if __name__ == "__main__":
     import argparse
     from sklearn import datasets
-    from sklearn.linear_model import LogisticRegression
+    from sklearn.linear_model import SGDClassifier
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--learning_rate', type=float, default=0.01, help='step size')
@@ -159,7 +159,7 @@ if __name__ == "__main__":
 
     # Compare to sklearn's equivalent models
     print("=" * 50)
-    print("sklearn.linear_model.LogisticRegression")
+    print("sklearn.linear_model.SGDClassifier")
     print("-" * 50)
     # sklearn needs train/test split and normalization to be done
     # outside of the model
@@ -175,9 +175,18 @@ if __name__ == "__main__":
     holdout_data = normalize(holdout_data, train_mean, train_std)
 
     # I'm using default parameters for sklearn, perhaps this is an unfair comparison?
-    sklearn_logistic = LogisticRegression().fit(train_data, train_targets)
+    alpha = args.l1 + args.l2
+    sklearn_logistic = SGDClassifier(
+        loss="log",
+        penalty="elasticnet",
+        alpha=alpha,
+        l1_ratio=args.l1 / alpha if alpha else 0.0,
+        n_iter=args.epochs,
+        learning_rate="constant",
+        eta0=args.learning_rate,
+    ).fit(train_data, train_targets)
     sgd_report(
-        epoch=sklearn_logistic.n_iter_[0],
+        epoch=args.epochs,
         loss=logloss(holdout_targets,
             sklearn_logistic.predict_proba(holdout_data)[:,1]),
         br=np.mean(holdout_targets),
