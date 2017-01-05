@@ -1,8 +1,8 @@
 from __future__ import absolute_import, print_function, division, unicode_literals
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import logloss, normLL, roc_auc, report
-from RegressionTree import RegressionTree
+from mlfromscratch.util import logloss, normLL, roc_auc, report
+from mlfromscratch.RegressionTree import RegressionTree
 
 
 class RandomForest():

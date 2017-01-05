@@ -3,8 +3,8 @@ import json
 from time import time
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import logloss, normLL, roc_auc, report
-from loss import Logistic_no_transform, L2
+from mlfromscratch.util import logloss, normLL, roc_auc, report
+from mlfromscratch.loss import Logistic_no_transform, L2
 
 def find_potential_splits(data, p=0.05):
     splits = np.percentile(data, 100 * np.arange(p, 1.0, p), axis=0)

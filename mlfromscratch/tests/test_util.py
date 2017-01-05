@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from sklearn.metrics import roc_auc_score as sklearn_roc_auc_score
-from util import *
+from mlfromscratch.util import *
 
 def rounded_list(array, digits=6):
     """

@@ -2,8 +2,8 @@ from __future__ import absolute_import, print_function, division, unicode_litera
 import json
 import numpy as np
 from sklearn.model_selection import train_test_split
-from util import normalize, logloss, normLL, ilogit, shuffle_rows
-from loss import Logistic, L2
+from mlfromscratch.util import normalize, logloss, normLL, ilogit, shuffle_rows
+from mlfromscratch.loss import Logistic, L2
 
 def sgd_report(epoch, loss, br, bias):
     print(
