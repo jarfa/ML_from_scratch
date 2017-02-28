@@ -8,4 +8,6 @@ While I had learned a lot about the most commonly used algorithms in grad school
 
 Since then I've changed jobs, and after a traveling a lot in the Summer and Fall of 2016 I've found some free time again. I am (intermittently) writing some of the more commonly used ML algorithms from near-scratch and comparing their performance (both in terms of predictive power and computational efficiency) versus [scikit-learn](http://scikit-learn.org/stable/). While I feel that I had a pretty good handle on this subject beforehand, I think that forcing myself to reinvent the wheel has been worthwhile.
 
-Note: these algorithms exist for my re-education and very little else. My algorithms will hopefully be just as good at prediction as scikit-learn's options, but theirs are more fully-featured and much faster (since they're written in [Cython](http://cython.org/)). There is no reason anybody should be using my algorithms unless they find my code educational.
+These algorithms exist for my re-education and very little else. My algorithms will hopefully be just as good at prediction as scikit-learn's options, but theirs are more fully-featured and much faster (since they're written in [Cython](http://cython.org/)). There is no reason anybody should be using my algorithms unless they find my code educational.
+
+Note: this project is completely unrelated to (and was started before) the very similarly named repo [ML-from-scratch](https://github.com/eriklindernoren/ML-From-Scratch). I guess my name wasn't as original as I had hoped. 
