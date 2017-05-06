@@ -60,10 +60,10 @@ def roc_auc(observed, predicted, presorted=False):
     # I'm separating out these functions to ease testing (and to have my output
     # be more closely comparable to sklearn's implementation)
     tpr, fpr = roc_curve(observed, predicted, presorted=presorted)
-    # start with the area of the first trapezoid under the curve. This looks
-    # weird but the alterantive is less clean.
+    # We're going to sum up the area under the curve, trapezoid by trapezoid.
+    # Start with the area of the first trapezoid under the curve.
     auc = fpr[0] * tpr[0] / 2.0
-    for i in range(N_tot)[1:]:
+    for i in range(1, N_tot):
         # adding the area of each additional trapezoid
         auc += (fpr[i] - fpr[i-1]) * (tpr[i] + tpr[i-1]) / 2.0
 
