@@ -55,7 +55,7 @@ class RegressionTree():
 
     def _predict_event(self, event):
         subtree = self.tree
-        while(True):
+        while True:
             feat, val = subtree["split_feature"], subtree["split_value"]
             if feat is None:
                 return subtree["mean_predict"]
@@ -74,8 +74,8 @@ class RegressionTree():
 
     def predict_proba(self, data):
         # This implementation doesn't need a separate predict_proba
-        # method, but I'm adding it to make let my demonstration
-        # code have an easier time looping through models
+        # method, but I'm adding it to let my demonstration code have
+        # an easier time looping through models
         return self.predict(data)
 
     def find_split(self, data, targets, leaf_only=False):
